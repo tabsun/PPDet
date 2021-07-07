@@ -1,0 +1,10 @@
+Metadata-Version: 1.0
+Name: instaboostfast
+Version: 0.1.2
+Summary: a python implementation for paper: "InstaBoost: Boosting Instance Segmentation Via Probability Map GuidedCopy-Pasting"
+Home-page: https://github.com/GothicAi/InstaBoost-pypi
+Author: Haoshu Fang, Jianhua Sun, Runzhong Wang,  Minghao Gou, Yonglu Li, Cewu Lu
+Author-email: 1751196720@qq.com
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN
