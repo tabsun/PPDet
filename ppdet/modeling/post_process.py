@@ -56,10 +56,11 @@ class BBoxPostProcess(object):
         """
         if self.nms is not None:
             bboxes, score = self.decode(head_out, rois, im_shape, scale_factor)
+            # decode output ([2000, 3, 4], [2000]) and [2000, 3]
             bbox_pred, bbox_num, _ = self.nms(bboxes, score, self.num_classes)
+            # NMS output [N, 6] and [N] results
         else:
-            bbox_pred, bbox_num = self.decode(head_out, rois, im_shape,
-                                              scale_factor)
+            bboxes, score = self.decode(head_out, rois, im_shape, scale_factor)
 
         # Prevent empty bbox_pred from decode or NMS.
         # Bboxes and score before NMS may be empty due to the score threshold.
@@ -69,6 +70,60 @@ class BBoxPostProcess(object):
                     [[-1, 0.0, 0.0, 0.0, 0.0, 0.0]], dtype='float32'))
             bbox_num = paddle.to_tensor(np.array([1], dtype='int32'))
         return bbox_pred, bbox_num
+
+    def do_nms(self, bboxes, score):
+        bbox_pred, bbox_num, _ = self.nms(bboxes, score, self.num_classes)
+        # Prevent empty bbox_pred from decode or NMS.
+        # Bboxes and score before NMS may be empty due to the score threshold.
+        if bbox_pred.shape[0] == 0:
+            bbox_pred = paddle.to_tensor(
+                np.array(
+                    [[-1, 0.0, 0.0, 0.0, 0.0, 0.0]], dtype='float32'))
+            bbox_num = paddle.to_tensor(np.array([1], dtype='int32'))
+        return bbox_pred, bbox_num
+        
+    def calc_back_detections(self, head_out, rois, im_shape, scale_factor, offsets=None):
+        bboxes, score = self.decode(head_out, rois, im_shape, scale_factor)
+        pred_bbox, bbox_num = bboxes
+
+        # pred_bbox : [N, 3, 4]
+        # bbox_num  : [N]
+        # score     : [N, 3]
+        origin_shape = paddle.floor(im_shape / scale_factor + 0.5)
+        assert(origin_shape.shape[0] == 1)
+        N = bbox_num[0]
+
+        # scale_factor: scale_y, scale_x
+        expand_shape = paddle.expand(origin_shape[0:1, :], [N, 3, 2])
+        scale_y, scale_x = scale_factor[0][0], scale_factor[0][1]
+        scale = paddle.concat([scale_x, scale_y, scale_x, scale_y])
+        expand_scale = paddle.expand(scale, [N, 3, 4])
+        if(offsets is not None):
+            offset_x, offest_y = offsets[0][0], offsets[0][1]
+            offset = paddle.concat([offset_x, offest_y, offset_x, offest_y])
+            expand_offset = paddle.expand(offset, [N, 3, 4])
+
+        # rescale bbox to original image
+        scaled_bbox = pred_bbox / expand_scale
+        origin_h = expand_shape[:, :, 0]
+        origin_w = expand_shape[:, :, 1]
+        zeros = paddle.zeros_like(origin_h)
+        # clip bbox to [0, original_size]
+        x1 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 0], origin_w), zeros)
+        y1 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 1], origin_h), zeros)
+        x2 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 2], origin_w), zeros)
+        y2 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 3], origin_h), zeros)
+        pred_bbox = paddle.stack([x1, y1, x2, y2], axis=-1)
+        pred_bbox += expand_offset
+
+        return pred_bbox, score
+        # # filter empty bbox
+        # keep_mask = nonempty_bbox(pred_bbox, return_mask=True)
+        # keep_mask = paddle.unsqueeze(keep_mask, [1])
+        # pred_label = paddle.where(keep_mask, pred_label,
+        #                           paddle.ones_like(pred_label) * -1)
+        # pred_result = paddle.concat([pred_label, pred_score, pred_bbox], axis=1)
+        # return pred_result
 
     def get_pred(self, bboxes, bbox_num, im_shape, scale_factor):
         """
@@ -85,6 +140,7 @@ class BBoxPostProcess(object):
                 shape [1], and is N.
             im_shape (Tensor): The shape of the input image.
             scale_factor (Tensor): The scale factor of the input image.
+            offsets (Tensor): The input data's offset in origin image.
         Returns:
             pred_result (Tensor): The final prediction results with shape [N, 6]
                 including labels, scores and bboxes.

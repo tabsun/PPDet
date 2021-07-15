@@ -150,7 +150,6 @@ class Decode(BaseOperator):
         #print("Decode time : %gms" % (t*1000/cv2.getTickFrequency()))
         return sample
 
-
 @register_op
 class Permute(BaseOperator):
     def __init__(self):
@@ -239,7 +238,6 @@ class RandomErasingImage(BaseOperator):
                     x1 + off_x1 + w), :] = 0
         sample['image'] = im
         return sample
-
 
 @register_op
 class NormalizeImage(BaseOperator):
@@ -602,6 +600,8 @@ class RandomFlip(BaseOperator):
         return sample
 
 
+
+
 @register_op
 class Resize(BaseOperator):
     def __init__(self, target_size, keep_ratio, interp=cv2.INTER_LINEAR):
@@ -779,6 +779,40 @@ class Resize(BaseOperator):
 
         return sample
 
+@register_op
+class SlidingWindow(BaseOperator):
+    def __init__(self, input_size, stride, window):
+        """
+        Crop the image into multiple images by sliding window.
+        Args:
+            input_size (list of int): input image should be resized to the same size proper for stride and window
+            stride (list of int): stride for width and height
+            window (list of int): window size width and height
+        """
+        super(SlidingWindow, self).__init__()
+        self.input_size = input_size
+        self.stride = stride
+        self.window = window
+
+    def apply(self, sample, context=None):
+        resizer = Resize(self.input_size, keep_ratio=True, interp=2)
+        sample = resizer(sample.copy(), context)
+
+        im = sample['image']
+        stride_x, stride_y = self.stride
+        win_x, win_y = self.window
+        h, w = im.shape[:2]
+        assert(win_x > stride_x and win_y > stride_y)
+
+        scale_y, scale_x = sample['scale_factor']
+        samples = []
+        for offset_y in range(0, h, win_y-stride_y):
+            for offset_x in range(0, w, win_x-stride_x):
+                crop_sample = sample.copy()
+                crop_sample['image'] = im[offset_y:min(h, offset_y+win_y), offset_x:min(w, offset_x+win_x), :].copy()
+                crop_sample['offset'] = [offset_x/scale_x, offset_y/scale_y]
+                samples.append(crop_sample)
+        return samples
 
 @register_op
 class MultiscaleTestResize(BaseOperator):
@@ -1862,10 +1896,10 @@ class Pad(BaseOperator):
         """
         super(Pad, self).__init__()
 
-        if not isinstance(size, (int, Sequence)):
-            raise TypeError(
-                "Type of target_size is invalid when random_size is True. \
-                            Must be List, now is {}".format(type(size)))
+        #if not isinstance(size, (int, Sequence)):
+        #    raise TypeError(
+        #        "Type of target_size is invalid when random_size is True. \
+        #                    Must be List, now is {}".format(type(size)))
 
         if isinstance(size, int):
             size = [size, size]
@@ -1873,7 +1907,8 @@ class Pad(BaseOperator):
         assert pad_mode in [
             -1, 0, 1, 2
         ], 'currently only supports four modes [-1, 0, 1, 2]'
-        assert pad_mode == -1 and offsets, 'if pad_mode is -1, offsets should not be None'
+        if(pad_mode == -1):
+            assert pad_mode == -1 and offsets, 'if pad_mode is -1, offsets should not be None'
 
         self.size = size
         self.size_divisor = size_divisor
@@ -1940,8 +1975,8 @@ class Pad(BaseOperator):
                 im_h < h and im_w < w
             ), '(h, w) of target size should be greater than (im_h, im_w)'
         else:
-            h = np.ceil(im_h // self.size_divisor) * self.size_divisor
-            w = np.ceil(im_w / self.size_divisor) * self.size_divisor
+            h = math.ceil(im_h / self.size_divisor) * self.size_divisor
+            w = math.ceil(im_w / self.size_divisor) * self.size_divisor
 
         if h == im_h and w == im_w:
             return sample

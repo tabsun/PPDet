@@ -2,76 +2,24 @@ worker_num: 1
 metric: COCO
 num_classes: 3
 
-TrainDataset:
+EvalDataset:
   !COCODataSet
     image_dir: train
     anno_path: annotations/train.json
-    dataset_dir: dataset/xd
-    data_fields: ['image', 'gt_bbox', 'gt_class', 'gt_poly']
+    dataset_dir: ../dataset/xd
+    data_fields: ['image', 'gt_bbox', 'gt_class']
 
-TrainReader:
+EvalReader:
   sample_transforms:
   - Decode: {}
-  - InstaBoost: {
-        anno_file: dataset/xd/annotations/train_with_pillar_and_standeye_beams_onlytrain.json,
-        image_dir: dataset/xd/train,
-        seg_dir: dataset/xd/train_segs,
-        categories: ['rect_eye', 'sphere_eye', 'box_eye'],
-        config_params: [
-                {'action_candidate': ['normal', 'horizontal', 'skip'],
-                 'action_prob': [0, 0, 1],
-                 'scale': [0.8, 1.2],
-                 'dx': 3.0,
-                 'dy': 0.1,
-                 'theta': [-1, 1],
-                 'color_prob': 0.0,
-                 'hflag': False,
-                 'use_local': True,
-                 'aug_prob': 0.,
-                 'beam_nums': [0, 1, 2],
-                 'beam_prob': [0., 1., 0.],
-                 'sync_nums': [1, 2, 3],
-                 'sync_prob': [0.2, 0.5, 0.3],
-                 'stand_eye_prob': 0.},
-                {'action_candidate': ['normal', 'horizontal', 'skip'],
-                 'action_prob': [0, 0, 1],
-                 'scale': [0.8, 1.2],
-                 'dx': 3.0,
-                 'dy': 0.5,
-                 'theta': [-1, 1],
-                 'color_prob': 0.0,
-                 'hflag': False,
-                 'use_local': True,
-                 'aug_prob': 0.,
-                 'beam_nums': [0, 1, 2],
-                 'beam_prob': [0., 1., 0.],
-                 'sync_nums': [1, 2, 3],
-                 'sync_prob': [0.2, 0.5, 0.3],
-                 'stand_eye_prob': 0.},
-                {'action_candidate': ['normal', 'horizontal', 'skip'],
-                 'action_prob': [0, 0, 1],
-                 'scale': [0.8, 1.2],
-                 'dx': 3.0,
-                 'dy': 0.5,
-                 'theta': [-1, 1],
-                 'color_prob': 0.0,
-                 'hflag': False,
-                 'use_local': False,
-                 'aug_prob': 0.,
-                 'beam_nums': [0, 1, 2],
-                 'beam_prob': [0.1, 0.7, 0.2],
-                 'sync_nums': [0, 1],
-                 'sync_prob': [0., 1.],
-                 'stand_eye_prob': 0.1}
-        ]}
-  - Mixup: {alpha: 1.5, beta: 1.5}
-  - RandomCrop: {allow_no_crop: true, thresholds: [0., 0., 0., 0.1, 0.3, 0.5, 0.7, 0.9], aspect_ratio: [1.5, 2.0], scaling: [0.16, 0.5]}
-  - RandomResize: {target_size: [[576,1024],[672,1195], [768,1365], [864,1536], [960,1707], [1065,1893], [1152,2048]], interp: 2, keep_ratio: False}
-  - RandomFlip: {prob: 0.5}
+    # generate multiple samples from Sliding Window
+  - SlidingWindow: {input_size: [1280,768], stride: [40, 40], window: [500, 400]}
+  - Resize: {target_size: [1152, 3333], keep_ratio: True, interp: 2}
   - NormalizeImage: {is_scale: true, mean: [0.485,0.456,0.406], std: [0.229, 0.224,0.225]}
   - Permute: {}
   batch_transforms:
-  - PadBatch: {pad_to_stride: 32, pad_gt: true}
+  - PadBatch: {pad_to_stride: 32, pad_gt: false}
   batch_size: 1
   shuffle: false
   drop_last: false
+  drop_empty: false

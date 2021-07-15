@@ -35,8 +35,8 @@ from ppdet.core.workspace import load_config, create
 def main():
     cfg = load_config('test_config.yml')
     # build data loader
-    dataset = cfg['TrainDataset']
-    loader = create('TrainReader')(dataset, cfg.worker_num)
+    dataset = cfg['EvalDataset']
+    loader = create('EvalReader')(dataset, cfg.worker_num)
 
     # im_id (1, 1)
     # is_crowd (1, 3, 1)
@@ -53,7 +53,12 @@ def main():
         #t = cv2.getTickCount() - t
         #print("%d - One loop time : %gms" % (step_id, t*1000/cv2.getTickFrequency()))
         #t = cv2.getTickCount()
-
+        
+        print(data.keys())
+        print(data['im_shape'])
+        print(data['image'].shape)
+        print(data['offset'])
+        exit(0)
         image = data['image'].numpy().squeeze()
         image = np.swapaxes(np.swapaxes(image, 0, 1), 1, 2)
         # mean: [0.485,0.456,0.406], std: [0.229, 0.224,0.225]

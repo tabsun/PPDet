@@ -57,6 +57,10 @@ class PadBatch(BaseOperator):
         Args:
             samples (list): a batch of sample, each is dict.
         """
+        assert(len(samples) == 1)
+        if(isinstance(samples[0], list)):
+            samples = samples[0].copy()
+
         t = cv2.getTickCount()
         coarsest_stride = self.pad_to_stride
 
@@ -76,6 +80,8 @@ class PadBatch(BaseOperator):
                 (im_c, max_shape[1], max_shape[2]), dtype=np.float32)
             padding_im[:, :im_h, :im_w] = im
             data['image'] = padding_im
+            data['data_size'] = [im_w, im_h]
+
             if 'semantic' in data and data['semantic'] is not None:
                 semantic = data['semantic']
                 padding_sem = np.zeros(
@@ -147,7 +153,6 @@ class PadBatch(BaseOperator):
         t = cv2.getTickCount() - t
         #print("PadBatch time : %gms" % (t*1000/cv2.getTickFrequency()))
         return samples
-
 
 @register_op
 class BatchRandomResize(BaseOperator):
