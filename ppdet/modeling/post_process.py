@@ -98,10 +98,6 @@ class BBoxPostProcess(object):
         scale_y, scale_x = scale_factor[0][0], scale_factor[0][1]
         scale = paddle.concat([scale_x, scale_y, scale_x, scale_y])
         expand_scale = paddle.expand(scale, [N, 3, 4])
-        if(offsets is not None):
-            offset_x, offest_y = offsets[0][0], offsets[0][1]
-            offset = paddle.concat([offset_x, offest_y, offset_x, offest_y])
-            expand_offset = paddle.expand(offset, [N, 3, 4])
 
         # rescale bbox to original image
         scaled_bbox = pred_bbox / expand_scale
@@ -114,7 +110,11 @@ class BBoxPostProcess(object):
         x2 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 2], origin_w), zeros)
         y2 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 3], origin_h), zeros)
         pred_bbox = paddle.stack([x1, y1, x2, y2], axis=-1)
-        pred_bbox += expand_offset
+        if(offsets is not None):
+            offset_x, offest_y = offsets[0][0], offsets[0][1]
+            offset = paddle.concat([offset_x, offest_y, offset_x, offest_y])
+            expand_offset = paddle.expand(offset, [N, 3, 4])
+            pred_bbox += expand_offset
 
         return pred_bbox, score
         # # filter empty bbox

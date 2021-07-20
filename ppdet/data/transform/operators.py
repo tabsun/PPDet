@@ -794,6 +794,21 @@ class SlidingWindow(BaseOperator):
         self.stride = stride
         self.window = window
 
+    def get_blocks(self, L, win, stride):
+        blocks = []
+        i = 0
+        while(i < L):
+            if(L - i - win < win // 2):
+                blocks.append([i, L])
+                break
+            elif(min(L, i+win) - i < win * 0.7):
+                blocks.append([L-win, L])
+                break
+            else:
+                blocks.append([i, i+win])
+            i += win - stride
+        return blocks
+
     def apply(self, sample, context=None):
         resizer = Resize(self.input_size, keep_ratio=True, interp=2)
         sample = resizer(sample.copy(), context)
@@ -806,12 +821,36 @@ class SlidingWindow(BaseOperator):
 
         scale_y, scale_x = sample['scale_factor']
         samples = []
-        for offset_y in range(0, h, win_y-stride_y):
-            for offset_x in range(0, w, win_x-stride_x):
+        blocks_x = self.get_blocks(w, win_x, stride_x)
+        blocks_y = self.get_blocks(h, win_y, stride_y)
+        for start_y, end_y in blocks_y:
+            for start_x, end_x in blocks_x:
                 crop_sample = sample.copy()
-                crop_sample['image'] = im[offset_y:min(h, offset_y+win_y), offset_x:min(w, offset_x+win_x), :].copy()
-                crop_sample['offset'] = [offset_x/scale_x, offset_y/scale_y]
+                crop_sample['image'] = im[start_y:min(h, end_y), start_x:min(w, end_x), :].copy()
+                crop_sample['offset'] = [start_x/scale_x, start_y/scale_y]
                 samples.append(crop_sample)
+        return samples
+
+@register_op
+class MultiscaleTest(BaseOperator):
+    def __init__(self, target_sizes):
+        """
+        Crop the image into multiple images by sliding window.
+        Args:
+            input_size (list of int): input image should be resized to the same size proper for stride and window
+            stride (list of int): stride for width and height
+            window (list of int): window size width and height
+        """
+        super(MultiscaleTest, self).__init__()
+        self.target_sizes = target_sizes
+
+    def apply(self, sample, context=None):
+        samples = []
+        for target_size in self.target_sizes:
+            resizer = Resize(target_size, keep_ratio=True, interp=2)
+            cur_sample = resizer(sample.copy(), context)
+            samples.append(cur_sample)
+
         return samples
 
 @register_op

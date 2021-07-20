@@ -90,6 +90,7 @@ class CascadeRCNN(BaseArch):
         N = self.inputs['image'].shape[0]
         pred_bboxes = []
         pred_scores = []
+        #all_detections = []
 
         for i in range(N):
             block_data = dict()
@@ -98,7 +99,8 @@ class CascadeRCNN(BaseArch):
             block_data['im_id'] = self.inputs['im_id'][i]
             block_data['im_shape'] = fluid.layers.crop_tensor(self.inputs['im_shape'], shape=[1,2], offsets=[i,0])
             block_data['scale_factor'] = fluid.layers.crop_tensor(self.inputs['scale_factor'], shape=[1,2], offsets=[i,0])
-            block_data['offset'] = fluid.layers.crop_tensor(self.inputs['offset'], shape=[1,2], offsets=[i,0])
+            if('offset' in self.inputs):
+                block_data['offset'] = fluid.layers.crop_tensor(self.inputs['offset'], shape=[1,2], offsets=[i,0])
 
             body_feats = self.backbone(block_data)
             if self.neck is not None:
@@ -110,23 +112,28 @@ class CascadeRCNN(BaseArch):
 
             im_shape = block_data['im_shape']
             scale_factor = block_data['scale_factor']
-            offsets = block_data['offset']
+            offsets = block_data['offset'] if 'offset' in block_data else None
 
             bboxes, scores = self.bbox_post_process.calc_back_detections(
                 preds, (refined_rois, rois_num), im_shape, scale_factor, offsets=offsets)
+
+            #detections, bbox_num = self.bbox_post_process.do_nms(bboxes, scores)
+            #all_detections.append(detections)
+
             bboxes, scores = bboxes.numpy(), scores.numpy()
             pred_bboxes.append(bboxes)
             pred_scores.append(scores)
 
+        #detections = fluid.layers.concat(all_detections, axis=0)
         pred_bboxes = paddle.to_tensor(np.concatenate(pred_bboxes, axis=0))
         pred_scores = paddle.to_tensor(np.concatenate(pred_scores, axis=0))
 
         #print('---------------before nms-----------------')
-        #print(pred_bboxes)
+        #print(pred_bboxes.shape)
         detections, bbox_num = self.bbox_post_process.do_nms(pred_bboxes, pred_scores)
         #print('---------------after nms-----------------')
-        #print(detections)
-        #bbox_num = paddle.to_tensor(np.array([detections.shape[0]], dtype='int32'))
+        #print(detections.shape)
+        bbox_num = paddle.to_tensor(np.array([detections.shape[0]], dtype='int32'))
 
         if not self.with_mask:
             return detections, bbox_num, None
