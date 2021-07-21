@@ -16,6 +16,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import cv2
 import paddle
 import paddle.fluid as fluid
 from ppdet.core.workspace import register, create
@@ -91,8 +92,13 @@ class CascadeRCNN(BaseArch):
         pred_bboxes = []
         pred_scores = []
         #all_detections = []
+        t = cv2.getTickCount()
 
         for i in range(N):
+            flip = False
+            if('flip_flag' in self.inputs):
+                flip = bool(self.inputs['flip_flag'].numpy()[i])
+
             block_data = dict()
             data_w, data_h = [int(x) for x in self.inputs['data_size'][i]]
             block_data['image'] = fluid.layers.crop_tensor(self.inputs['image'], shape=[1, 3, data_h, data_w], offsets=[i, 0, 0, 0])
@@ -115,7 +121,7 @@ class CascadeRCNN(BaseArch):
             offsets = block_data['offset'] if 'offset' in block_data else None
 
             bboxes, scores = self.bbox_post_process.calc_back_detections(
-                preds, (refined_rois, rois_num), im_shape, scale_factor, offsets=offsets)
+                preds, (refined_rois, rois_num), im_shape, scale_factor, offsets=offsets, flip=flip)
 
             #detections, bbox_num = self.bbox_post_process.do_nms(bboxes, scores)
             #all_detections.append(detections)
@@ -123,6 +129,9 @@ class CascadeRCNN(BaseArch):
             bboxes, scores = bboxes.numpy(), scores.numpy()
             pred_bboxes.append(bboxes)
             pred_scores.append(scores)
+
+        st = cv2.getTickCount() - t
+        #print("Infer time: %gms" % (st*1000/cv2.getTickFrequency()))
 
         #detections = fluid.layers.concat(all_detections, axis=0)
         pred_bboxes = paddle.to_tensor(np.concatenate(pred_bboxes, axis=0))
@@ -132,8 +141,10 @@ class CascadeRCNN(BaseArch):
         #print(pred_bboxes.shape)
         detections, bbox_num = self.bbox_post_process.do_nms(pred_bboxes, pred_scores)
         #print('---------------after nms-----------------')
-        #print(detections.shape)
         bbox_num = paddle.to_tensor(np.array([detections.shape[0]], dtype='int32'))
+
+        t = cv2.getTickCount() - t
+        #print("Model time: %gms" % (t * 1000 / cv2.getTickFrequency()))
 
         if not self.with_mask:
             return detections, bbox_num, None
@@ -171,6 +182,8 @@ class CascadeRCNN(BaseArch):
             # rescale the prediction back to origin image
             bbox_pred = self.bbox_post_process.get_pred(bbox, bbox_num,
                                                         im_shape, scale_factor)
+            print(bbox_pred.shape)
+            exit(0)
             if not self.with_mask:
                 return bbox_pred, bbox_num, None
             mask_out = self.mask_head(body_feats, bbox, bbox_num, self.inputs)

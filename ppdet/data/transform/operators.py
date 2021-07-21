@@ -593,7 +593,7 @@ class RandomFlip(BaseOperator):
                 sample['gt_rbox2poly'] = self.apply_rbox(sample['gt_rbox2poly'],
                                                          width)
 
-            sample['flipped'] = True
+            sample['flip_flag'] = True
             sample['image'] = im
         t = cv2.getTickCount() - t
         #print('Flip time : %gms' % (t*1000/cv2.getTickFrequency()))
@@ -833,7 +833,7 @@ class SlidingWindow(BaseOperator):
 
 @register_op
 class MultiscaleTest(BaseOperator):
-    def __init__(self, target_sizes):
+    def __init__(self, target_sizes, flip=False):
         """
         Crop the image into multiple images by sliding window.
         Args:
@@ -843,15 +843,23 @@ class MultiscaleTest(BaseOperator):
         """
         super(MultiscaleTest, self).__init__()
         self.target_sizes = target_sizes
+        self.flip = flip
 
     def apply(self, sample, context=None):
         samples = []
-        for target_size in self.target_sizes:
-            resizer = Resize(target_size, keep_ratio=True, interp=2)
-            cur_sample = resizer(sample.copy(), context)
-            samples.append(cur_sample)
+        sample['flip_flag'] = False
+        samples.append(sample)
+        if(self.flip):
+            flipper = RandomFlip(1.1)
+            samples.append(flipper(sample.copy(), context=context))
 
-        return samples
+        multi_samples = []
+        for sample in samples:
+            for target_size in self.target_sizes:
+                resizer = Resize(target_size, keep_ratio=True, interp=2)
+                cur_sample = resizer(sample.copy(), context)
+                multi_samples.append(cur_sample)
+        return multi_samples
 
 @register_op
 class MultiscaleTestResize(BaseOperator):

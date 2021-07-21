@@ -100,12 +100,12 @@ TrainDataset:
 
 EvalDataset:
   !COCODataSet
-    image_dir: val
-    anno_path: annotations/val.json
-    #anno_path: annotations/image_info_val.json
+    image_dir: test
+    #anno_path: annotations/val.json
+    anno_path: annotations/image_info_val.json
     dataset_dir: ../dataset/xd
-    data_fields: ['image', 'gt_bbox', 'gt_class']
-    #data_fields: ['image']
+    #data_fields: ['image', 'gt_bbox', 'gt_class']
+    data_fields: ['image']
 
 TestDataset:
   !ImageFolder
@@ -174,7 +174,7 @@ EvalReader:
   - Decode: {}
     #- SlidingWindow: {input_size: [1152, 2048], stride: [96, 64], window: [672, 384]}
     #- Resize: {target_size: [864, 1536], keep_ratio: True, interp: 2}
-  - MultiscaleTest: {target_sizes: [[768,3333],[960,3333],[1152,3333]]}
+  - MultiscaleTest: {target_sizes: [[1152,3333]], flip: true}
   - NormalizeImage: {is_scale: true, mean: [0.485,0.456,0.406], std: [0.229, 0.224,0.225]}
   - Pad: {fill_value: [0., 0., 0.]}
   - Permute: {}

@@ -82,7 +82,7 @@ class BBoxPostProcess(object):
             bbox_num = paddle.to_tensor(np.array([1], dtype='int32'))
         return bbox_pred, bbox_num
         
-    def calc_back_detections(self, head_out, rois, im_shape, scale_factor, offsets=None):
+    def calc_back_detections(self, head_out, rois, im_shape, scale_factor, offsets=None, flip=False):
         bboxes, score = self.decode(head_out, rois, im_shape, scale_factor)
         pred_bbox, bbox_num = bboxes
 
@@ -109,6 +109,13 @@ class BBoxPostProcess(object):
         y1 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 1], origin_h), zeros)
         x2 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 2], origin_w), zeros)
         y2 = paddle.maximum(paddle.minimum(scaled_bbox[:, :, 3], origin_h), zeros)
+
+        if(flip):
+            x1_ = origin_w - x1
+            x2_ = origin_w - x2
+            x1 = x2_
+            x2 = x1_
+
         pred_bbox = paddle.stack([x1, y1, x2, y2], axis=-1)
         if(offsets is not None):
             offset_x, offest_y = offsets[0][0], offsets[0][1]
