@@ -182,8 +182,6 @@ class CascadeRCNN(BaseArch):
             # rescale the prediction back to origin image
             bbox_pred = self.bbox_post_process.get_pred(bbox, bbox_num,
                                                         im_shape, scale_factor)
-            print(bbox_pred.shape)
-            exit(0)
             if not self.with_mask:
                 return bbox_pred, bbox_num, None
             mask_out = self.mask_head(body_feats, bbox, bbox_num, self.inputs)

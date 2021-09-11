@@ -31,3 +31,4 @@ from .hrnet import *
 from .blazenet import *
 from .ghostnet import *
 from .senet import *
+from .swin_transformer import *
